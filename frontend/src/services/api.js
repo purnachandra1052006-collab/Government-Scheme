@@ -55,12 +55,3 @@ export async function evaluateProfile(profile) {
   return await res.json();
 }
 
-export async function setGroqApiKey(apiKey) {
-  const res = await fetch(`${API_BASE_URL}/api/config/groq-key`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ api_key: apiKey }),
-  });
-  if (!res.ok) throw new Error("Failed to set Groq key");
-  return await res.json();
-}
