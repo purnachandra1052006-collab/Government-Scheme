@@ -26,18 +26,19 @@ export async function startChatSession() {
   return await res.json();
 }
 
-export async function sendChatMessage(sessionId, currentProfile, field, value) {
+export async function sendChatMessage(sessionId, currentProfile, userMessage, field = null, value = null) {
   const res = await fetch(`${API_BASE_URL}/api/chat/message`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       session_id: sessionId,
       current_profile: currentProfile,
+      user_message: userMessage,
       field: field,
       value: value,
     }),
   });
-  if (!res.ok) throw new Error("Failed to process intake answer");
+  if (!res.ok) throw new Error("Failed to process conversational turn");
   return await res.json();
 }
 

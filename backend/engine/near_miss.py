@@ -15,8 +15,6 @@ class NearMissEvaluator:
         if not failed_criteria or len(failed_criteria) > 2:
             return False, None
 
-        # Check if the failure is on hard/unbridgeable constraints (e.g. completely wrong target occupation like Farmer vs Student)
-        # However, if target occupation is somewhat adjacent (e.g. Unemployed vs Entrepreneur) it might be considered.
         soft_failures: List[str] = []
         action_steps: List[str] = []
         is_candidate_near_miss = True
@@ -24,16 +22,16 @@ class NearMissEvaluator:
         for fail in failed_criteria:
             fail_lower = fail.lower()
 
-            # 1. Income threshold near-miss (within 15% margin)
+            # 1. Income threshold near-miss (within 20% margin)
             if "income" in fail_lower and scheme.max_income and user.annual_income:
                 gap = user.annual_income - scheme.max_income
                 pct_over = (gap / scheme.max_income) * 100
-                if 0 < pct_over <= 20.0:
+                if 0 < pct_over <= 25.0:
                     soft_failures.append(
                         f"Income of ₹{user.annual_income:,.0f} exceeds the ceiling limit of ₹{scheme.max_income:,.0f} by ₹{gap:,.0f} ({pct_over:.1f}%)."
                     )
                     action_steps.append(
-                        f"If household income adjustments (such as standard deductions, medical allowances, or agricultural exemptions) bring gross taxable income below ₹{scheme.max_income:,.0f}, you will become fully eligible."
+                        f"If household income deductions (such as standard deductions, medical allowances, or agricultural income exemptions) bring net income below ₹{scheme.max_income:,.0f}, you will become fully eligible."
                     )
                 else:
                     is_candidate_near_miss = False
@@ -47,7 +45,7 @@ class NearMissEvaluator:
                             f"Age ({user.age} yrs) exceeds maximum limit of {scheme.max_age} yrs by {years_over} year(s)."
                         )
                         action_steps.append(
-                            f"Check if you qualify for category age relaxations (e.g., 3-5 years relaxation for SC/ST/OBC/Women/PwD) available under state/central guidelines."
+                            f"Check if you qualify for category age relaxations (3-5 years relaxation for SC/ST/OBC/Women/PwD) available under state/central guidelines."
                         )
                     else:
                         is_candidate_near_miss = False
@@ -58,48 +56,71 @@ class NearMissEvaluator:
                             f"Age ({user.age} yrs) is just {years_under} year below the minimum eligible age of {scheme.min_age}."
                         )
                         action_steps.append(
-                            f"You will automatically qualify once you turn {scheme.min_age}. Begin preparing your project report and documents in advance."
+                            f"You will automatically qualify once you turn {scheme.min_age}. Begin preparing your documents and registration in advance."
                         )
                     else:
                         is_candidate_near_miss = False
                 else:
                     is_candidate_near_miss = False
 
-            # 3. Educational qualification near-miss (1 step below)
+            # 3. Girl Child Age Near-Miss (Sukanya Samriddhi - Age 11 yrs vs max 10 yrs)
+            elif "girl child must be 10" in fail_lower and user.girl_child_age:
+                if user.girl_child_age <= 11:
+                    soft_failures.append(
+                        f"Girl child age ({user.girl_child_age} yrs) exceeds standard limit of 10 years by 1 year."
+                    )
+                    action_steps.append(
+                        "Check for 1-year grace period notifications under Post Office savings rules or explore Balika Samriddhi Yojana."
+                    )
+                else:
+                    is_candidate_near_miss = False
+
+            # 4. Disability Percentage Near-Miss (35% vs 40% benchmark)
+            elif "disability" in fail_lower and user.disability_percentage:
+                if 30 <= user.disability_percentage < 40:
+                    soft_failures.append(
+                        f"Assessed disability percentage ({user.disability_percentage}%) is near the 40% benchmark threshold."
+                    )
+                    action_steps.append(
+                        "Request a re-assessment from your District Medical Board / Civil Hospital to obtain an updated UDID certificate."
+                    )
+                else:
+                    is_candidate_near_miss = False
+
+            # 5. Educational qualification near-miss
             elif "qualification" in fail_lower or "8th pass" in fail_lower or "10th pass" in fail_lower or "12th pass" in fail_lower:
-                user_rank = get_qualification_rank(user.education_level)
                 soft_failures.append(
                     f"Required educational qualification not fully met (Current: {user.education_level or 'Unspecified'})."
                 )
                 action_steps.append(
-                    "You can enroll in National Institute of Open Schooling (NIOS) or apply for funding below ₹10 Lakhs where educational restrictions are relaxed."
+                    "You can enroll in National Institute of Open Schooling (NIOS) or apply for funding below ₹10 Lakhs where educational criteria are relaxed."
                 )
 
-            # 4. Greenfield / New project condition
+            # 6. Greenfield / New project condition
             elif "greenfield" in fail_lower or "new project" in fail_lower:
                 soft_failures.append(
                     "Scheme requires greenfield (new unit setup), whereas you indicated an existing business."
                 )
                 action_steps.append(
-                    "You can either apply for a new branch / distinct registered vertical, or opt for Mudra Scheme (Tarun) / PMEGP 2nd Loan for existing unit expansion."
+                    "You can apply under MUDRA Scheme (Tarun) or PMEGP 2nd Loan for existing unit expansion."
                 )
 
-            # 5. Demographic / Category condition (e.g. Stand-Up India partnership)
+            # 7. Demographic / Category condition
             elif "women" in fail_lower or "sc/st" in fail_lower:
                 soft_failures.append(
                     "Requires applicant to be a Woman or SC/ST entrepreneur."
                 )
                 action_steps.append(
-                    "If setting up a partnership, LLP, or Pvt Ltd enterprise where at least 51% shareholding is held by a Woman or SC/ST co-founder, the venture qualifies for Stand-Up India."
+                    "If setting up a partnership, LLP, or Pvt Ltd where at least 51% shareholding is held by a Woman or SC/ST co-founder, the venture qualifies."
                 )
 
-            # 6. Pucca house condition for housing schemes
+            # 8. Pucca house condition
             elif "pucca house" in fail_lower:
                 soft_failures.append(
                     "Disqualified due to existing pucca house ownership."
                 )
                 action_steps.append(
-                    "If applying for separate adult family units living independently without documented title in the existing pucca house, verify local municipal/panchayat survey criteria."
+                    "If applying for separate adult family units living independently without title in the existing house, verify local survey guidelines."
                 )
 
             else:

@@ -1,119 +1,142 @@
 export const SAMPLE_PROFILES = [
   {
+    id: "pregnant_rural_mother",
+    title: "🤰 Sunita Devi (Rural Expecting Mother)",
+    badge: "Health & Maternity (PMMVY & PM-JAY)",
+    description: "23-year-old rural woman expecting her first child with family income ₹1.6 Lakhs looking for healthcare & nutrition grants.",
+    profile: {
+      age: 23,
+      gender: "Female",
+      caste: "OBC",
+      occupation: "Unemployed",
+      annual_income: 160000,
+      state: "Uttar Pradesh",
+      area_type: "Rural",
+      education_level: "10th Pass",
+      is_pregnant_or_lactating: true,
+      has_bpl_ration_card: true,
+      owns_pucca_house: false,
+      is_tax_payer: false
+    }
+  },
+  {
+    id: "solar_homeowner_farmer",
+    title: "☀️ Rajesh Deshmukh (Solar Rooftop & Farming)",
+    badge: "PM Surya Ghar & PM-KISAN",
+    description: "42-year-old farmer and homeowner with roof space seeking solar rooftop subsidy and agricultural income support.",
+    profile: {
+      age: 42,
+      gender: "Male",
+      caste: "General",
+      occupation: "Farmer",
+      annual_income: 380000,
+      state: "Maharashtra",
+      area_type: "Rural",
+      education_level: "12th Pass",
+      has_solar_rooftop_space: true,
+      land_holding_acres: 3.5,
+      owns_pucca_house: true,
+      is_tax_payer: false
+    }
+  },
+  {
+    id: "differently_abled_student",
+    title: "♿ Amit Kumar (Divyangjan Tech Student)",
+    badge: "ADIP Free Aids & Scholarships",
+    description: "21-year-old student with 50% benchmark locomotive disability seeking assistive devices and higher education support.",
+    profile: {
+      age: 21,
+      gender: "Male",
+      caste: "SC",
+      occupation: "Student",
+      annual_income: 180000,
+      state: "Bihar",
+      area_type: "Semi-Urban",
+      education_level: "12th Pass",
+      is_differently_abled: true,
+      disability_percentage: 50,
+      owns_pucca_house: false,
+      is_tax_payer: false
+    }
+  },
+  {
+    id: "girl_child_parent",
+    title: "👧 Vikram Mehta (Parent of 6-Yr-Old Girl)",
+    badge: "Sukanya Samriddhi 8.2% Sovereign Savings",
+    description: "34-year-old father wanting to open a guaranteed tax-free savings fund for his 6-year-old daughter's higher education.",
+    profile: {
+      age: 34,
+      gender: "Male",
+      caste: "General",
+      occupation: "Salaried",
+      annual_income: 600000,
+      state: "Gujarat",
+      area_type: "Urban",
+      education_level: "Graduate",
+      has_girl_child: true,
+      girl_child_age: 6,
+      owns_pucca_house: true,
+      is_tax_payer: true
+    }
+  },
+  {
+    id: "senior_bpl_citizen",
+    title: "🧓 Shanti Bai (Senior Citizen Pensioner)",
+    badge: "IGNOAPS Old Age Pension & Free Ayushman",
+    description: "66-year-old elderly woman from BPL household seeking monthly old-age social security pension and healthcare.",
+    profile: {
+      age: 66,
+      gender: "Female",
+      caste: "SC",
+      occupation: "Unemployed",
+      annual_income: 80000,
+      state: "Rajasthan",
+      area_type: "Rural",
+      has_bpl_ration_card: true,
+      owns_pucca_house: false,
+      is_tax_payer: false
+    }
+  },
+  {
+    id: "unorganised_construction_worker",
+    title: "👷 Manoj Paswan (e-Shram Construction Worker)",
+    badge: "PM-SYM ₹3,000/mo Pension & PMSBY Insurance",
+    description: "29-year-old registered daily-wage construction worker seeking accidental insurance and lifelong pension support.",
+    profile: {
+      age: 29,
+      gender: "Male",
+      caste: "OBC",
+      occupation: "Construction Worker",
+      annual_income: 140000,
+      state: "Madhya Pradesh",
+      area_type: "Semi-Urban",
+      education_level: "8th Pass",
+      is_unorganised_worker: true,
+      is_construction_worker: true,
+      has_bpl_ration_card: true,
+      owns_pucca_house: false,
+      is_tax_payer: false
+    }
+  },
+  {
     id: "rural_woman_entrepreneur",
-    title: "👩‍💼 Priya Sharma (Woman Entrepreneur)",
-    badge: "Entrepreneurship & Stand-Up India",
-    description: "28-year-old female setting up a new food processing manufacturing enterprise seeking ₹25 Lakhs loan.",
+    title: "👩‍💼 Priya Sharma (Stand-Up India MSME)",
+    badge: "Stand-Up India ₹25L Greenfield Loan",
+    description: "28-year-old female launching a new manufacturing enterprise seeking ₹25 Lakhs loan and capital subsidy.",
     profile: {
       age: 28,
       gender: "Female",
       caste: "General",
       occupation: "Entrepreneur",
       annual_income: 450000,
-      state: "Maharashtra",
+      state: "Karnataka",
+      area_type: "Rural",
       education_level: "Graduate",
-      specific_goal: "Business Setup & Capital Subsidy",
       business_type: "Manufacturing",
       funding_required: 2500000,
       is_new_project: true,
       owns_pucca_house: true,
       is_tax_payer: true
-    }
-  },
-  {
-    id: "sc_college_student",
-    title: "🎓 Rahul Verma (SC Engineering Student)",
-    badge: "100% Scholarship & Maintenance Allowance",
-    description: "20-year-old SC student pursuing B.Tech Degree with family annual income ₹1.8 Lakhs.",
-    profile: {
-      age: 20,
-      gender: "Male",
-      caste: "SC",
-      occupation: "Student",
-      annual_income: 180000,
-      state: "Uttar Pradesh",
-      education_level: "12th Pass",
-      specific_goal: "Higher Education Tuition Support",
-      marks_percentage: 84.5,
-      owns_pucca_house: false,
-      is_tax_payer: false
-    }
-  },
-  {
-    id: "marginal_farmer",
-    title: "🌾 Rameshwar Patel (Smallholder Farmer)",
-    badge: "PM-KISAN & Subsidized Agri-Credit",
-    description: "48-year-old small farmer with 2 acres landholding seeking seasonal income and credit support.",
-    profile: {
-      age: 48,
-      gender: "Male",
-      caste: "OBC",
-      occupation: "Farmer",
-      annual_income: 140000,
-      state: "Madhya Pradesh",
-      education_level: "8th Pass",
-      specific_goal: "Direct Income Support & Crop Inputs",
-      land_holding_acres: 2.0,
-      owns_pucca_house: false,
-      is_tax_payer: false
-    }
-  },
-  {
-    id: "near_miss_student",
-    title: "⚡ Ananya Gupta (Near-Miss Student Case)",
-    badge: "Near-Miss Income Edge Case (₹2.65L vs ₹2.5L)",
-    description: "21-year-old OBC student whose income slightly exceeds the scholarship threshold by 6%.",
-    profile: {
-      age: 21,
-      gender: "Female",
-      caste: "OBC",
-      occupation: "Student",
-      annual_income: 265000,
-      state: "Karnataka",
-      education_level: "12th Pass",
-      specific_goal: "College Scholarship Support",
-      marks_percentage: 82.0,
-      owns_pucca_house: true,
-      is_tax_payer: false
-    }
-  },
-  {
-    id: "traditional_artisan",
-    title: "⚒️ Bhaskar Rao (Traditional Potter & Artisan)",
-    badge: "PM Vishwakarma ₹15k Tool Grant & 5% Loan",
-    description: "36-year-old traditional potter looking for modern tool kits and collateral-free enterprise credit.",
-    profile: {
-      age: 36,
-      gender: "Male",
-      caste: "OBC",
-      occupation: "Artisan",
-      annual_income: 160000,
-      state: "Andhra Pradesh",
-      education_level: "Below 8th",
-      specific_goal: "Artisan Tool Kit & Working Capital",
-      business_type: "Traditional Craft",
-      funding_required: 100000,
-      owns_pucca_house: false,
-      is_tax_payer: false
-    }
-  },
-  {
-    id: "urban_street_vendor",
-    title: "🛒 Suresh Kumar (Urban Fruit Vendor)",
-    badge: "PM SVANidhi Microcredit & Cashback",
-    description: "32-year-old street vendor looking for ₹10,000 - ₹50,000 working capital with 7% interest subsidy.",
-    profile: {
-      age: 32,
-      gender: "Male",
-      caste: "General",
-      occupation: "Street Vendor",
-      annual_income: 180000,
-      state: "Delhi",
-      education_level: "10th Pass",
-      specific_goal: "Working Capital for Vending Stall",
-      funding_required: 20000,
-      owns_pucca_house: false,
-      is_tax_payer: false
     }
   }
 ];

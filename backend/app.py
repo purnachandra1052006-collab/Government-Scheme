@@ -93,12 +93,14 @@ def start_chat_session():
 @app.post("/api/chat/message", response_model=ChatIntakeSession)
 def process_chat_message(payload: IntakeAnswerPayload):
     session_id = payload.session_id or "default_session"
-    return intake_manager.process_answer(
+    return intake_manager.process_turn(
         session_id=session_id,
+        user_message=payload.user_message,
         field=payload.field,
         value=payload.value,
         current_profile=payload.current_profile,
     )
+
 
 
 @app.post("/api/evaluate", response_model=EvaluationResponse)

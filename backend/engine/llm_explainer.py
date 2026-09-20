@@ -1,6 +1,7 @@
 import json
 import logging
-from typing import List, Dict, Any, Optional
+import re
+from typing import List, Dict, Any, Optional, Tuple
 from openai import OpenAI
 from backend.config import config
 from backend.models.schemas import (
@@ -37,6 +38,226 @@ class LLMExplainer:
             except Exception as e:
                 logger.warning(f"Failed to re-initialize Groq client: {e}")
                 self.client = None
+
+    def process_conversational_turn(
+        self,
+        user_message: str,
+        current_profile: UserProfile,
+        chat_history: List[Dict[str, str]],
+        schemes_summary: str = "",
+    ) -> Tuple[UserProfile, str, List[str], bool]:
+        """
+        Processes natural language user dialogue with the LLM:
+        1. Extracts profile attributes mentioned in text.
+        2. Answers citizen questions about schemes.
+        3. Returns conversational reply + smart dynamic quick-reply suggestions.
+        """
+        profile_dict = current_profile.model_dump()
+        extracted_updates = {}
+        assistant_reply = ""
+        suggested_replies = []
+        is_ready_to_evaluate = False
+
+        if self.client:
+            try:
+                prompt = f"""You are GovScheme.AI, an empathetic, expert government welfare and scheme advisor for Indian citizens.
+Your job is to have a natural, helpful conversation with the citizen, extract their profile attributes into structured data, answer any questions they have about government schemes, and guide them towards discovering all schemes they are eligible for.
+
+Current Citizen Profile state:
+{json.dumps(profile_dict, indent=2)}
+
+Available National Schemes Context (Brief):
+{schemes_summary[:3000]}
+
+Conversation History:
+{json.dumps(chat_history[-6:], indent=2)}
+
+Citizen's Latest Message:
+"{user_message}"
+
+Task:
+1. Extract any newly provided or updated profile attributes from the citizen's message.
+   Possible fields to extract:
+   - age (int, e.g. 28)
+   - gender ("Female" | "Male" | "Other")
+   - caste ("General" | "OBC" | "SC" | "ST" | "EWS")
+   - occupation ("Entrepreneur" | "Student" | "Farmer" | "Street Vendor" | "Artisan" | "Construction Worker" | "Unemployed" | "Salaried")
+   - annual_income (float in INR, e.g. 250000)
+   - state (e.g. "Karnataka", "Maharashtra", "Uttar Pradesh", "Bihar", etc.)
+   - area_type ("Rural" | "Urban" | "Semi-Urban")
+   - education_level ("Below 8th" | "8th Pass" | "10th Pass" | "12th Pass" | "Diploma" | "Graduate" | "Post Graduate")
+   - specific_goal (string describing primary goal)
+   - is_pregnant_or_lactating (boolean)
+   - has_girl_child (boolean) & girl_child_age (int)
+   - is_differently_abled (boolean) & disability_percentage (float)
+   - has_solar_rooftop_space (boolean)
+   - has_bpl_ration_card (boolean)
+   - is_unorganised_worker (boolean)
+   - business_type (string, e.g. "Manufacturing", "Dairy", "Solar", "Tech")
+   - funding_required (float)
+   - is_new_project (boolean)
+   - land_holding_acres (float)
+
+2. If the user asked a question about a scheme or benefit (e.g., "What is PM Surya Ghar?", "Can I get loan for my business?"), answer it clearly, concisely, and encouragingly.
+
+3. Formulate a friendly, natural assistant reply that:
+   - Confirms what you understood.
+   - Answers their query (if any).
+   - Asks for the next most relevant missing profile detail (such as income, age, or state) to complete their eligibility evaluation.
+
+4. Provide 2-4 context-aware suggested quick-reply buttons (e.g., ["Income is under ₹2.5L", "Income is ₹5L+", "Tell me about Dairy loans", "Run Eligibility Match"]).
+
+5. Set "is_ready_to_evaluate": true if the user explicitly asks to see eligible schemes / results, OR if core attributes (occupation, age, income/caste) are sufficiently provided.
+
+Return STRICT JSON matching:
+{{
+  "extracted_attributes": {{}},
+  "assistant_reply": "string",
+  "suggested_quick_replies": ["string", "string"],
+  "is_ready_to_evaluate": boolean
+}}"""
+
+                response = self.client.chat.completions.create(
+                    model=config.GROQ_MODEL,
+                    messages=[
+                        {"role": "system", "content": "You are a specialized government scheme advisor that outputs strict JSON."},
+                        {"role": "user", "content": prompt}
+                    ],
+                    response_format={"type": "json_object"},
+                    temperature=0.3,
+                    max_tokens=800,
+                )
+                data = json.loads(response.choices[0].message.content)
+                extracted_updates = data.get("extracted_attributes", {})
+                assistant_reply = data.get("assistant_reply", "")
+                suggested_replies = data.get("suggested_quick_replies", [])
+                is_ready_to_evaluate = data.get("is_ready_to_evaluate", False)
+
+            except Exception as e:
+                logger.warning(f"Groq conversational extraction error, using rule-based NLP fallback: {e}")
+
+        # Rule-based NLP extraction fallback to guarantee 100% reliability
+        text_lower = user_message.lower()
+
+        # Extract Age
+        age_match = re.search(r'\b(?:i am |age is |age |i\'m )?(\d{1,2})\s*(?:years?|yrs?|yr)?\s*(?:old)?\b', text_lower)
+        if age_match:
+            try:
+                val = int(age_match.group(1))
+                if 10 <= val <= 95 and "age" not in extracted_updates:
+                    extracted_updates["age"] = val
+            except ValueError:
+                pass
+
+        # Extract Gender
+        if "female" in text_lower or "woman" in text_lower or "girl" in text_lower or "mother" in text_lower:
+            extracted_updates.setdefault("gender", "Female")
+        elif "male" in text_lower or " man" in text_lower or "boy" in text_lower or "father" in text_lower:
+            extracted_updates.setdefault("gender", "Male")
+
+        # Extract Social Category
+        if "sc category" in text_lower or "scheduled caste" in text_lower or "\bsc\b" in text_lower:
+            extracted_updates.setdefault("caste", "SC")
+        elif "st category" in text_lower or "scheduled tribe" in text_lower or "\bst\b" in text_lower:
+            extracted_updates.setdefault("caste", "ST")
+        elif "obc" in text_lower or "backward class" in text_lower:
+            extracted_updates.setdefault("caste", "OBC")
+        elif "ews" in text_lower or "economically weaker" in text_lower:
+            extracted_updates.setdefault("caste", "EWS")
+        elif "general category" in text_lower or "general" in text_lower:
+            extracted_updates.setdefault("caste", "General")
+
+        # Extract Income
+        lakh_match = re.search(r'(?:income|earning|salary|make|revenue)?\s*(?:is|of|about|around)?\s*(?:₹|rs\.?|inr)?\s*([0-9.]+)\s*(?:lakhs?|lac|lacs?|l)\b', text_lower)
+        if lakh_match:
+            try:
+                lakh_val = float(lakh_match.group(1)) * 100000
+                extracted_updates.setdefault("annual_income", lakh_val)
+            except ValueError:
+                pass
+
+        # Extract Occupation
+        if any(w in text_lower for w in ["student", "studying", "college", "bca", "btech", "bsc", "school", "degree", "exam"]):
+            extracted_updates.setdefault("occupation", "Student")
+        elif any(w in text_lower for w in ["farmer", "farming", "agriculture", "crop", "dairy", "land", "cultivat"]):
+            extracted_updates.setdefault("occupation", "Farmer")
+            extracted_updates.setdefault("is_farmer", True)
+        elif any(w in text_lower for w in ["business", "entrepreneur", "startup", "shop", "msme", "factory", "store", "company"]):
+            extracted_updates.setdefault("occupation", "Entrepreneur")
+        elif any(w in text_lower for w in ["vendor", "hawker", "thela", "street vendor", "cart"]):
+            extracted_updates.setdefault("occupation", "Street Vendor")
+        elif any(w in text_lower for w in ["artisan", "craft", "potter", "weaver", "tailor", "carpenter", "blacksmith"]):
+            extracted_updates.setdefault("occupation", "Artisan")
+            extracted_updates.setdefault("is_artisan_weaver", True)
+        elif any(w in text_lower for w in ["construction", "labour", "worker", "daily wage", "mason"]):
+            extracted_updates.setdefault("occupation", "Construction Worker")
+            extracted_updates.setdefault("is_construction_worker", True)
+            extracted_updates.setdefault("is_unorganised_worker", True)
+
+        # Specialized Vulnerabilities
+        if "pregnant" in text_lower or "expecting" in text_lower or "lactating" in text_lower or "maternity" in text_lower:
+            extracted_updates.setdefault("is_pregnant_or_lactating", True)
+            extracted_updates.setdefault("gender", "Female")
+
+        if "daughter" in text_lower or "girl child" in text_lower:
+            extracted_updates.setdefault("has_girl_child", True)
+            gc_age = re.search(r'(?:daughter|girl|child)\s*(?:is|of|age)?\s*(\d{1,2})', text_lower)
+            if gc_age:
+                extracted_updates.setdefault("girl_child_age", int(gc_age.group(1)))
+
+        if "solar" in text_lower or "rooftop" in text_lower or "electricity bill" in text_lower or "solar panel" in text_lower:
+            extracted_updates.setdefault("has_solar_rooftop_space", True)
+
+        if "disabled" in text_lower or "disability" in text_lower or "handicapped" in text_lower or "divyang" in text_lower:
+            extracted_updates.setdefault("is_differently_abled", True)
+
+        if "bpl" in text_lower or "ration card" in text_lower or "antyodaya" in text_lower:
+            extracted_updates.setdefault("has_bpl_ration_card", True)
+
+        if "rural" in text_lower or "village" in text_lower or "panchayat" in text_lower:
+            extracted_updates.setdefault("area_type", "Rural")
+        elif "urban" in text_lower or "city" in text_lower or "metro" in text_lower:
+            extracted_updates.setdefault("area_type", "Urban")
+
+        # Merge extracted updates into current profile
+        updated_dict = current_profile.model_dump()
+        for k, v in extracted_updates.items():
+            if v is not None:
+                updated_dict[k] = v
+        new_profile = UserProfile(**updated_dict)
+
+        # Fallback assistant reply if LLM didn't produce one
+        if not assistant_reply:
+            extracted_keys = list(extracted_updates.keys())
+            if extracted_keys:
+                items_str = ", ".join([f"{k}: {extracted_updates[k]}" for k in extracted_keys])
+                assistant_reply = f"Thank you! I have recorded your details ({items_str}). "
+            else:
+                assistant_reply = "I understand. "
+
+            # Determine next missing piece
+            if new_profile.occupation is None:
+                assistant_reply += "What is your primary occupation or current status (e.g. Student, Entrepreneur, Farmer, Artisan, Salaried)?"
+                suggested_replies = ["💼 Entrepreneur", "🎓 Student", "🌾 Farmer", "🛒 Street Vendor", "⚒️ Artisan"]
+            elif new_profile.annual_income is None:
+                assistant_reply += f"To check income caps for scholarships and subsidies, what is your approximate gross Annual Household Income?"
+                suggested_replies = ["Under ₹1.5 Lakhs", "₹2.5 Lakhs - ₹4.5 Lakhs", "₹5 Lakhs - ₹8 Lakhs", "Above ₹8 Lakhs"]
+            elif new_profile.age is None:
+                assistant_reply += "What is your current age?"
+                suggested_replies = ["18-25 yrs", "26-35 yrs", "36-50 yrs", "60+ yrs (Senior)"]
+            elif new_profile.caste is None:
+                assistant_reply += "Which social category do you belong to (General, OBC, SC, ST, or EWS)?"
+                suggested_replies = ["General", "OBC", "SC (35% Subsidies)", "ST", "EWS"]
+            else:
+                assistant_reply += "Great! We have collected key eligibility attributes. You can tell me about specific goals (like Solar panels, Business loan, Maternity, or Higher studies), or click below to evaluate your eligible schemes!"
+                suggested_replies = ["🚀 Run Scheme Eligibility Match", "☀️ Tell me about Solar Subsidy", "💼 Business Loan Subsidy", "🎓 Scholarship Schemes"]
+                is_ready_to_evaluate = True
+
+        # Check if user explicitly asked for evaluation
+        if any(term in text_lower for term in ["evaluate", "check scheme", "show scheme", "my schemes", "qualify", "find scheme", "run match"]):
+            is_ready_to_evaluate = True
+
+        return new_profile, assistant_reply, suggested_replies, is_ready_to_evaluate
 
     def generate_scheme_reasoning(
         self, user: UserProfile, scheme: Scheme, matched_criteria: List[str]
@@ -155,9 +376,9 @@ Top schemes: {scheme_names}. Highlight total financial impact potential."""
                 pass
 
         if direct_count > 0:
-            return f"Great news! Based on your {user.occupation or 'applicant'} profile ({user.caste or 'Citizen'}, Age {user.age or 'Eligible'}), you qualify for {direct_count} government schemes with high financial grants and subsidies like {scheme_names}. Review your personalized document checklist to apply immediately."
+            return f"Great news! Based on your profile ({user.occupation or 'Applicant'}, {user.caste or 'Citizen'}), you qualify for {direct_count} government schemes with high financial assistance like {scheme_names}. Review your personalized document checklist to apply."
         else:
-            return f"We found {near_miss_count} near-miss government schemes. With minor adjustments (such as category relaxation or income thresholds), you can become eligible for high-impact schemes like {scheme_names}."
+            return f"We identified {near_miss_count} near-miss government schemes. With slight eligibility adjustments (such as category relaxation or income thresholds), you can become eligible for high-impact schemes like {scheme_names}."
 
 
 # Singleton explainer instance

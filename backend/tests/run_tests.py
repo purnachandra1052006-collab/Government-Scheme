@@ -2,8 +2,9 @@ import unittest
 import sys
 import os
 
-# Ensure workspace root is in sys.path
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
+PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+if PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, PROJECT_ROOT)
 
 from backend.models.schemas import UserProfile, SchemeMatch, MatchReasoning
 from backend.engine.rule_engine import RuleEngine, load_schemes_db
@@ -12,20 +13,20 @@ from backend.engine.ranking import RankingEngine
 from backend.engine.document_checklist import DocumentChecklistManager
 
 
-class TestRuleEngineAndLogic(unittest.TestCase):
+class TestMultiDomainRuleEngine(unittest.TestCase):
     def setUp(self):
         self.schemes = load_schemes_db()
         self.rule_engine = RuleEngine(self.schemes)
 
-    def test_student_scholarship_direct_match(self):
+    def test_health_ayushman_bharat_match(self):
+        # Low income family should match Ayushman Bharat PM-JAY regardless of occupation
         user = UserProfile(
-            age=20,
+            age=34,
             gender="Male",
-            caste="SC",
-            occupation="Student",
-            annual_income=180000,
-            state="Maharashtra",
-            education_level="12th Pass",
+            caste="OBC",
+            occupation="Salaried",
+            annual_income=220000,
+            state="Bihar",
         )
         direct_ids = []
         for scheme in self.rule_engine.schemes:
@@ -33,111 +34,144 @@ class TestRuleEngineAndLogic(unittest.TestCase):
             if is_direct:
                 direct_ids.append(scheme.id)
 
-        self.assertIn("post_matric_04", direct_ids)
-        self.assertIn("csss_10", direct_ids)
+        self.assertIn("pm_jay_health", direct_ids)
 
-    def test_entrepreneur_pmegp_and_standup(self):
-        user = UserProfile(
-            age=28,
-            gender="Female",
-            caste="SC",
-            occupation="Entrepreneur",
-            annual_income=400000,
-            state="Karnataka",
-            education_level="Graduate",
-            is_new_project=True,
-            funding_required=2500000,
-        )
-        direct_ids = []
-        for scheme in self.rule_engine.schemes:
-            is_direct, matched, failed = self.rule_engine.evaluate_scheme(user, scheme)
-            if is_direct:
-                direct_ids.append(scheme.id)
-
-        self.assertIn("pmegp_01", direct_ids)
-        self.assertIn("standup_03", direct_ids)
-        self.assertIn("mudra_02", direct_ids)
-
-    def test_near_miss_income_overflow(self):
-        user = UserProfile(
-            age=21,
-            gender="Female",
-            caste="OBC",
-            occupation="Student",
-            annual_income=260000,
-            state="Delhi",
-            education_level="12th Pass",
-        )
-        post_matric = next(s for s in self.rule_engine.schemes if s.id == "post_matric_04")
-        is_direct, matched, failed = self.rule_engine.evaluate_scheme(user, post_matric)
-
-        self.assertFalse(is_direct)
-        is_near_miss, reason = NearMissEvaluator.evaluate_near_miss(user, post_matric, failed)
-        self.assertTrue(is_near_miss)
-        self.assertIsNotNone(reason)
-        self.assertTrue("₹260,000" in reason.gap_explanation or "260,000" in reason.gap_explanation)
-        self.assertIn("household income", reason.how_to_qualify.lower())
-
-    def test_farmer_pm_kisan_match(self):
-        user = UserProfile(
-            age=45,
-            gender="Male",
-            caste="General",
-            occupation="Farmer",
-            annual_income=120000,
-            state="Uttar Pradesh",
-            is_tax_payer=False,
-        )
-        pm_kisan = next(s for s in self.rule_engine.schemes if s.id == "pm_kisan_05")
-        is_direct, matched, failed = self.rule_engine.evaluate_scheme(user, pm_kisan)
-
-        self.assertTrue(is_direct)
-
-    def test_artisan_vishwakarma_match(self):
-        user = UserProfile(
-            age=35,
-            gender="Male",
-            caste="OBC",
-            occupation="Artisan",
-            annual_income=150000,
-            state="Rajasthan",
-        )
-        vishwakarma = next(s for s in self.rule_engine.schemes if s.id == "pm_vishwakarma_07")
-        is_direct, matched, failed = self.rule_engine.evaluate_scheme(user, vishwakarma)
-
-        self.assertTrue(is_direct)
-
-    def test_document_consolidation(self):
+    def test_maternity_pmmvy_match(self):
+        # Pregnant female should match PMMVY
         user = UserProfile(
             age=24,
             gender="Female",
-            caste="SC",
-            occupation="Entrepreneur",
+            caste="General",
+            occupation="Unemployed",
             annual_income=300000,
-            state="Tamil Nadu",
-            education_level="Graduate",
-            is_new_project=True,
+            state="Uttar Pradesh",
+            is_pregnant_or_lactating=True,
         )
-        direct = []
+        direct_ids = []
         for scheme in self.rule_engine.schemes:
-            is_d, m, f = self.rule_engine.evaluate_scheme(user, scheme)
-            if is_d:
-                direct.append(scheme)
+            is_direct, matched, failed = self.rule_engine.evaluate_scheme(user, scheme)
+            if is_direct:
+                direct_ids.append(scheme.id)
 
-        direct_matches = [
-            SchemeMatch(
-                scheme=s,
-                match_type="direct",
-                match_score=90.0,
-                financial_score=80.0,
-                total_rank_score=1085.0,
-                reasoning=MatchReasoning(why_you_qualify=[], key_benefits_highlight=[], action_items=[])
-            )
-            for s in direct
-        ]
-        docs = DocumentChecklistManager.generate_consolidated_checklist(direct_matches, [])
-        self.assertTrue(len(docs.universal_documents) > 0)
-        self.assertTrue(any("Aadhaar" in doc for doc in docs.universal_documents))
+        self.assertIn("pmmvy_maternity", direct_ids)
+
+    def test_solar_rooftop_pm_surya_ghar(self):
+        # Homeowner with solar rooftop space
+        user = UserProfile(
+            age=40,
+            gender="Male",
+            caste="General",
+            occupation="Salaried",
+            annual_income=700000,
+            state="Maharashtra",
+            has_solar_rooftop_space=True,
+        )
+        direct_ids = []
+        for scheme in self.rule_engine.schemes:
+            is_direct, matched, failed = self.rule_engine.evaluate_scheme(user, scheme)
+            if is_direct:
+                direct_ids.append(scheme.id)
+
+        self.assertIn("pm_surya_ghar", direct_ids)
+
+    def test_disability_adip_scheme(self):
+        # Differently abled citizen with 50% disability
+        user = UserProfile(
+            age=22,
+            gender="Male",
+            caste="SC",
+            occupation="Student",
+            annual_income=150000,
+            state="Tamil Nadu",
+            is_differently_abled=True,
+            disability_percentage=50.0,
+        )
+        direct_ids = []
+        for scheme in self.rule_engine.schemes:
+            is_direct, matched, failed = self.rule_engine.evaluate_scheme(user, scheme)
+            if is_direct:
+                direct_ids.append(scheme.id)
+
+        self.assertIn("adip_divyangjan", direct_ids)
+
+    def test_girl_child_sukanya_samriddhi(self):
+        # Parent of a 6-year-old girl child
+        user = UserProfile(
+            age=32,
+            gender="Male",
+            caste="General",
+            occupation="Entrepreneur",
+            annual_income=500000,
+            state="Karnataka",
+            has_girl_child=True,
+            girl_child_age=6,
+        )
+        direct_ids = []
+        for scheme in self.rule_engine.schemes:
+            is_direct, matched, failed = self.rule_engine.evaluate_scheme(user, scheme)
+            if is_direct:
+                direct_ids.append(scheme.id)
+
+        self.assertIn("ssy_girl_child", direct_ids)
+
+    def test_senior_citizen_pension(self):
+        # 65-year-old BPL senior citizen
+        user = UserProfile(
+            age=65,
+            gender="Female",
+            caste="SC",
+            occupation="Unemployed",
+            annual_income=90000,
+            state="Rajasthan",
+            has_bpl_ration_card=True,
+        )
+        direct_ids = []
+        for scheme in self.rule_engine.schemes:
+            is_direct, matched, failed = self.rule_engine.evaluate_scheme(user, scheme)
+            if is_direct:
+                direct_ids.append(scheme.id)
+
+        self.assertIn("ignoaps_pension", direct_ids)
+
+    def test_unorganised_worker_pension(self):
+        # Construction / unorganised worker
+        user = UserProfile(
+            age=29,
+            gender="Male",
+            caste="OBC",
+            occupation="Construction Worker",
+            annual_income=140000,
+            state="Madhya Pradesh",
+            is_unorganised_worker=True,
+            is_tax_payer=False,
+        )
+        direct_ids = []
+        for scheme in self.rule_engine.schemes:
+            is_direct, matched, failed = self.rule_engine.evaluate_scheme(user, scheme)
+            if is_direct:
+                direct_ids.append(scheme.id)
+
+        self.assertIn("pm_sym_pension", direct_ids)
+
+    def test_near_miss_girl_child_age(self):
+        # Girl child is 11 years old (exceeds 10-year limit by 1 year)
+        user = UserProfile(
+            age=35,
+            gender="Female",
+            caste="General",
+            occupation="Salaried",
+            annual_income=400000,
+            state="Delhi",
+            has_girl_child=True,
+            girl_child_age=11,
+        )
+        ssy = next(s for s in self.rule_engine.schemes if s.id == "ssy_girl_child")
+        is_direct, matched, failed = self.rule_engine.evaluate_scheme(user, ssy)
+        self.assertFalse(is_direct)
+
+        is_near, reason = NearMissEvaluator.evaluate_near_miss(user, ssy, failed)
+        self.assertTrue(is_near)
+        self.assertIn("11", reason.gap_explanation)
 
 
 if __name__ == "__main__":

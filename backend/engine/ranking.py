@@ -20,30 +20,30 @@ class RankingEngine:
         # 1. Base Match Score
         if match_type == "direct":
             base_match = 85.0
-            # Bonus for strong targeted demographic matches
             bonus = 0.0
             if user.caste and user.caste in ["SC", "ST", "OBC"] and len(scheme.caste_category) < 5:
                 bonus += 5.0
             if user.gender == "Female" and "Female" in scheme.gender_preference:
                 bonus += 5.0
-            if user.occupation and user.occupation in scheme.target_audience and len(scheme.target_audience) <= 2:
+            if user.interested_domains and scheme.domain in user.interested_domains:
                 bonus += 5.0
+            if user.is_differently_abled and scheme.category == "Disability & Accessibility":
+                bonus += 10.0
+            if user.is_pregnant_or_lactating and "Maternity" in scheme.name:
+                bonus += 10.0
             match_score = min(100.0, base_match + bonus)
         else:
-            # Near miss gets between 50 and 70 based on soft failures
             penalty = len(failed_criteria) * 12.0
             match_score = max(40.0, 75.0 - penalty)
 
-        # 2. Financial Benefit Score (Logarithmic scaling so ₹50L doesn't completely overwhelm ₹1L but ranks higher)
+        # 2. Financial Benefit Score
         fin_val = scheme.financial_benefit_value or 10000.0
-        # Use log10 scale: log10(1,000) ~ 3, log10(100,000) = 5, log10(10,000,000) = 7
         min_log = math.log10(5000)
         max_log = math.log10(MAX_BENEFIT_SCALE)
         curr_log = math.log10(max(5000.0, fin_val))
         financial_score = min(100.0, max(10.0, ((curr_log - min_log) / (max_log - min_log)) * 100.0))
 
         # 3. Weighted Total Rank Score
-        # Direct matches receive massive priority over near misses
         type_weight = 1000.0 if match_type == "direct" else 0.0
         total_rank_score = type_weight + (match_score * 0.6) + (financial_score * 0.4)
 
