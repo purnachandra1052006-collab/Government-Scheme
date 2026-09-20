@@ -49,6 +49,26 @@ export default function SchemeCard({ match, onSelectScheme, onViewDocuments }) {
           <span className="text-[11px] font-bold text-blue-700 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded-md">
             {scheme.category || scheme.domain}
           </span>
+
+          {scheme.central_or_state === "State Government" || scheme.state_name ? (
+            <span className="inline-flex items-center gap-1 text-[11px] font-bold text-purple-700 bg-purple-50 border border-purple-200 px-2 py-0.5 rounded-md">
+              🏛️ {scheme.state_name || scheme.states_applicable?.[0] || "State"} Govt
+            </span>
+          ) : (
+            <span className="inline-flex items-center gap-1 text-[11px] font-bold text-slate-700 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded-md">
+              🇮🇳 Central Govt
+            </span>
+          )}
+
+          {scheme.beneficiary_level === "Family / Household" ? (
+            <span className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-800 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-md">
+              👨‍👩‍👧 Family Welfare
+            </span>
+          ) : (
+            <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-800 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-md">
+              👤 Individual Benefit
+            </span>
+          )}
         </div>
 
         {/* Match Score Badge */}

@@ -7,9 +7,8 @@ PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
 
-from fastapi import FastAPI, HTTPException, Body
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
 
 from backend.config import config
 from backend.models.schemas import (
@@ -48,10 +47,6 @@ schemes_db: List[Scheme] = load_schemes_db()
 rule_engine = RuleEngine(schemes_db)
 
 
-class SetApiKeyPayload(BaseModel):
-    api_key: str
-
-
 @app.get("/api/health")
 def health_check():
     return {
@@ -73,16 +68,6 @@ def get_scheme(scheme_id: str):
         if s.id == scheme_id:
             return s
     raise HTTPException(status_code=404, detail="Scheme not found")
-
-
-@app.post("/api/config/groq-key")
-def set_groq_key(payload: SetApiKeyPayload):
-    llm_explainer.update_api_key(payload.api_key)
-    return {
-        "success": True,
-        "message": "Groq API key updated successfully",
-        "groq_configured": bool(payload.api_key),
-    }
 
 
 @app.post("/api/chat/start", response_model=ChatIntakeSession)
@@ -168,13 +153,47 @@ def evaluate_profile(profile: UserProfile):
     ranked_direct = RankingEngine.rank_matches(direct_matches)
     ranked_near_miss = RankingEngine.rank_matches(near_miss_matches)
 
+    # Separate into Primary Requirement Matches vs Additional Opportunities
+    user_interests = [d.lower() for d in (profile.interested_domains or [])]
+    user_goal = (profile.specific_goal or "").lower()
+
+    primary_matches: List[SchemeMatch] = []
+    other_matches: List[SchemeMatch] = []
+
+    for match in ranked_direct:
+        s_domain = (match.scheme.category or match.scheme.domain or "").lower()
+        s_name = match.scheme.name.lower()
+        s_desc = match.scheme.description.lower()
+
+        is_primary = False
+        if user_interests:
+            if any(interest in s_domain for interest in user_interests):
+                is_primary = True
+        elif user_goal:
+            if any(term in s_domain or term in s_name or term in s_desc for term in user_goal.split()):
+                is_primary = True
+
+        if is_primary:
+            primary_matches.append(match)
+        else:
+            other_matches.append(match)
+
+    # If user didn't specify a narrow target, all direct matches are primary
+    if not user_interests and not user_goal:
+        primary_matches = ranked_direct
+        other_matches = []
+    elif not primary_matches:
+        # If no strict domain matched, keep top direct as primary
+        primary_matches = ranked_direct[:3]
+        other_matches = ranked_direct[3:]
+
     # Generate consolidated documents checklist
     consolidated_docs = DocumentChecklistManager.generate_consolidated_checklist(
         ranked_direct, ranked_near_miss
     )
 
     # Generate overall summary insight
-    top_schemes = [m.scheme for m in ranked_direct] if ranked_direct else [m.scheme for m in ranked_near_miss]
+    top_schemes = [m.scheme for m in primary_matches] if primary_matches else [m.scheme for m in ranked_direct]
     summary_insight = llm_explainer.generate_overall_summary(
         profile, len(ranked_direct), len(ranked_near_miss), top_schemes
     )
@@ -182,12 +201,17 @@ def evaluate_profile(profile: UserProfile):
     return EvaluationResponse(
         user_profile=profile,
         direct_matches=ranked_direct,
+        primary_matches=primary_matches,
+        other_matches=other_matches,
         near_miss_matches=ranked_near_miss,
         total_direct_count=len(ranked_direct),
         total_near_miss_count=len(ranked_near_miss),
+        expressed_requirements=profile.interested_domains or ([profile.specific_goal] if profile.specific_goal else []),
+        target_domain_labels=profile.interested_domains or [],
         consolidated_documents=consolidated_docs,
         summary_insight=summary_insight,
     )
+
 
 
 if __name__ == "__main__":

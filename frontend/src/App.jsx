@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import confetti from "canvas-confetti";
 import { 
   Building2, 
@@ -24,9 +24,8 @@ import DocumentChecklist from "./components/DocumentChecklist";
 import SchemeComparison from "./components/SchemeComparison";
 import SchemeCatalog from "./components/SchemeCatalog";
 import SchemeDetailModal from "./components/SchemeDetailModal";
-import GroqKeyModal from "./components/GroqKeyModal";
 
-import { evaluateProfile, checkHealth } from "./services/api";
+import { evaluateProfile } from "./services/api";
 
 export default function App() {
   const [activeTab, setActiveTab] = useState("chat"); // 'chat' | 'wizard' | 'catalog'
@@ -34,15 +33,7 @@ export default function App() {
   const [evaluation, setEvaluation] = useState(null);
   const [isEvaluating, setIsEvaluating] = useState(false);
   const [selectedSchemeForModal, setSelectedSchemeForModal] = useState(null);
-  const [showGroqModal, setShowGroqModal] = useState(false);
-  const [groqConfigured, setGroqConfigured] = useState(false);
   const [resultsFilter, setResultsFilter] = useState("all"); // 'all' | 'direct' | 'near_miss'
-
-  useEffect(() => {
-    checkHealth().then((res) => {
-      setGroqConfigured(res.groq_configured);
-    });
-  }, []);
 
   const triggerConfetti = () => {
     try {
@@ -94,8 +85,6 @@ export default function App() {
         activeTab={activeTab}
         setActiveTab={setActiveTab}
         onSelectSampleProfile={handleSelectSampleProfile}
-        onOpenGroqModal={() => setShowGroqModal(true)}
-        groqConfigured={groqConfigured}
       />
 
       {/* Main Content Container */}
@@ -209,7 +198,7 @@ export default function App() {
                 </div>
 
                 {/* Filter Pills */}
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   <button
                     onClick={() => setResultsFilter("all")}
                     className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all ${
@@ -220,6 +209,19 @@ export default function App() {
                   >
                     All Schemes ({evaluation.total_direct_count + evaluation.total_near_miss_count})
                   </button>
+
+                  {evaluation.primary_matches && evaluation.primary_matches.length > 0 && evaluation.other_matches && evaluation.other_matches.length > 0 && (
+                    <button
+                      onClick={() => setResultsFilter("priority")}
+                      className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
+                        resultsFilter === "priority"
+                          ? "bg-blue-600 text-white shadow-xs"
+                          : "bg-blue-50 text-blue-800 border border-blue-200 hover:bg-blue-100"
+                      }`}
+                    >
+                      <span>🎯 Priority Goal Matches ({evaluation.primary_matches.length})</span>
+                    </button>
+                  )}
 
                   <button
                     onClick={() => setResultsFilter("direct")}
@@ -244,28 +246,98 @@ export default function App() {
                   </button>
                 </div>
 
-                {/* Scheme Cards Grid */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {(resultsFilter === "all" || resultsFilter === "direct") &&
-                    filteredDirect.map((match) => (
-                      <SchemeCard
-                        key={match.scheme.id}
-                        match={match}
-                        onSelectScheme={(s) => setSelectedSchemeForModal(s)}
-                        onViewDocuments={(s) => setSelectedSchemeForModal(s)}
-                      />
-                    ))}
+                {/* Section 1: Primary Requirement Matches */}
+                {(resultsFilter === "all" || resultsFilter === "priority" || resultsFilter === "direct") && (
+                  <div className="space-y-4">
+                    {evaluation.primary_matches && evaluation.primary_matches.length > 0 && (
+                      <div className="bg-gradient-to-r from-blue-50 via-indigo-50 to-white border border-blue-200 rounded-2xl p-4 flex items-center justify-between">
+                        <div className="flex items-center gap-2.5">
+                          <span className="text-base">🎯</span>
+                          <div>
+                            <h3 className="font-extrabold text-sm text-blue-950">
+                              Direct Requirement Matches ({evaluation.primary_matches.length})
+                            </h3>
+                            <p className="text-xs text-blue-700">
+                              {evaluation.expressed_requirements && evaluation.expressed_requirements.length > 0
+                                ? `Schemes directly matching your expressed need for: ${evaluation.expressed_requirements.join(", ")}`
+                                : "Top schemes matching your primary demographic and welfare profile"}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
 
-                  {(resultsFilter === "all" || resultsFilter === "near_miss") &&
-                    filteredNearMiss.map((match) => (
-                      <SchemeCard
-                        key={match.scheme.id}
-                        match={match}
-                        onSelectScheme={(s) => setSelectedSchemeForModal(s)}
-                        onViewDocuments={(s) => setSelectedSchemeForModal(s)}
-                      />
-                    ))}
-                </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      {(resultsFilter === "priority" ? evaluation.primary_matches : (resultsFilter === "direct" ? evaluation.direct_matches : (evaluation.primary_matches || evaluation.direct_matches))).map((match) => (
+                        <SchemeCard
+                          key={match.scheme.id}
+                          match={match}
+                          onSelectScheme={(s) => setSelectedSchemeForModal(s)}
+                          onViewDocuments={(s) => setSelectedSchemeForModal(s)}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Section 2: Additional Cross-Domain Opportunities */}
+                {resultsFilter === "all" && evaluation.other_matches && evaluation.other_matches.length > 0 && (
+                  <div className="space-y-4 pt-4 border-t border-slate-200">
+                    <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 flex items-center justify-between">
+                      <div className="flex items-center gap-2.5">
+                        <span className="text-base">✨</span>
+                        <div>
+                          <h3 className="font-extrabold text-sm text-slate-800">
+                            Additional Schemes & Opportunities You Also Qualify For ({evaluation.other_matches.length})
+                          </h3>
+                          <p className="text-xs text-slate-500">
+                            Other central and state programs you satisfy based on your demographic profile
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      {evaluation.other_matches.map((match) => (
+                        <SchemeCard
+                          key={match.scheme.id}
+                          match={match}
+                          onSelectScheme={(s) => setSelectedSchemeForModal(s)}
+                          onViewDocuments={(s) => setSelectedSchemeForModal(s)}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Section 3: Near-Miss Opportunities */}
+                {(resultsFilter === "all" || resultsFilter === "near_miss") && evaluation.near_miss_matches && evaluation.near_miss_matches.length > 0 && (
+                  <div className="space-y-4 pt-4 border-t border-slate-200">
+                    <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex items-center gap-2.5">
+                      <span className="text-base">⚡</span>
+                      <div>
+                        <h3 className="font-extrabold text-sm text-amber-950">
+                          Near-Miss Opportunities ({evaluation.near_miss_matches.length})
+                        </h3>
+                        <p className="text-xs text-amber-800">
+                          Schemes where 1 soft criterion is near threshold with actionable advice to qualify
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      {evaluation.near_miss_matches.map((match) => (
+                        <SchemeCard
+                          key={match.scheme.id}
+                          match={match}
+                          onSelectScheme={(s) => setSelectedSchemeForModal(s)}
+                          onViewDocuments={(s) => setSelectedSchemeForModal(s)}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                )}
+
 
                 {/* Interactive Document Checklist Component */}
                 <DocumentChecklist
@@ -340,12 +412,6 @@ export default function App() {
         onClose={() => setSelectedSchemeForModal(null)}
       />
 
-      <GroqKeyModal
-        isOpen={showGroqModal}
-        onClose={() => setShowGroqModal(false)}
-        onKeySaved={() => setGroqConfigured(true)}
-        currentConfigured={groqConfigured}
-      />
 
       {/* Footer */}
       <footer className="bg-white border-t border-slate-200 py-6 mt-12">

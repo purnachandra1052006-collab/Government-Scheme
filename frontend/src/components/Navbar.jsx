@@ -2,22 +2,16 @@ import React, { useState } from "react";
 import { 
   Building2, 
   Sparkles, 
-  Key, 
-  CheckCircle2, 
   MessageSquare, 
   FileSpreadsheet, 
-  BookOpen, 
-  HelpCircle,
-  ShieldAlert
+  BookOpen
 } from "lucide-react";
 import { SAMPLE_PROFILES } from "../data/sampleProfiles";
 
 export default function Navbar({ 
   activeTab, 
   setActiveTab, 
-  onSelectSampleProfile, 
-  onOpenGroqModal, 
-  groqConfigured 
+  onSelectSampleProfile
 }) {
   const [showSampleDropdown, setShowSampleDropdown] = useState(false);
 
@@ -132,25 +126,6 @@ export default function Navbar({
                 </div>
               )}
             </div>
-
-            {/* Groq LLM Key Button */}
-            <button
-              onClick={onOpenGroqModal}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
-                groqConfigured
-                  ? "bg-emerald-50 text-emerald-800 border-emerald-200 hover:bg-emerald-100"
-                  : "bg-slate-100 text-slate-700 border-slate-300 hover:bg-slate-200"
-              }`}
-              title="Configure Groq API Key for Llama-3.3 Reasoning"
-            >
-              <Key className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Groq LLM</span>
-              {groqConfigured ? (
-                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-              ) : (
-                <span className="w-2 h-2 rounded-full bg-amber-500" />
-              )}
-            </button>
 
           </div>
 

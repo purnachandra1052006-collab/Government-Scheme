@@ -26,11 +26,17 @@ export default function QuickFormIntake({ profile, setProfile, onEvaluate, isEva
     area_type: profile.area_type || "Rural",
     education_level: profile.education_level || "Graduate",
     specific_goal: profile.specific_goal || "Business Setup & Loan",
+    beneficiary_type: profile.beneficiary_type || "All",
     is_new_project: profile.is_new_project !== undefined ? profile.is_new_project : true,
     funding_required: profile.funding_required || 2000000,
     owns_pucca_house: profile.owns_pucca_house || false,
     has_bpl_ration_card: profile.has_bpl_ration_card || false,
     is_tax_payer: profile.is_tax_payer || false,
+    owns_agricultural_land: profile.owns_agricultural_land || false,
+    land_holding_acres: profile.land_holding_acres || 0,
+    is_landless: profile.is_landless || false,
+    has_homestead_plot: profile.has_homestead_plot || false,
+    owns_motorized_vehicle: profile.owns_motorized_vehicle || false,
     is_differently_abled: profile.is_differently_abled || false,
     disability_percentage: profile.disability_percentage || 40,
     is_pregnant_or_lactating: profile.is_pregnant_or_lactating || false,
@@ -179,28 +185,53 @@ export default function QuickFormIntake({ profile, setProfile, onEvaluate, isEva
               className="w-full text-xs sm:text-sm px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:bg-white"
             >
               <option value="All India">All India (National)</option>
-              <option value="Maharashtra">Maharashtra</option>
-              <option value="Uttar Pradesh">Uttar Pradesh</option>
-              <option value="Karnataka">Karnataka</option>
-              <option value="Tamil Nadu">Tamil Nadu</option>
-              <option value="Madhya Pradesh">Madhya Pradesh</option>
-              <option value="Gujarat">Gujarat</option>
-              <option value="Rajasthan">Rajasthan</option>
+              <option value="Andhra Pradesh">Andhra Pradesh</option>
+              <option value="Assam">Assam</option>
               <option value="Bihar">Bihar</option>
               <option value="Delhi">Delhi</option>
+              <option value="Gujarat">Gujarat</option>
+              <option value="Haryana">Haryana</option>
+              <option value="Karnataka">Karnataka</option>
+              <option value="Kerala">Kerala</option>
+              <option value="Madhya Pradesh">Madhya Pradesh</option>
+              <option value="Maharashtra">Maharashtra</option>
+              <option value="Odisha">Odisha</option>
+              <option value="Punjab">Punjab</option>
+              <option value="Rajasthan">Rajasthan</option>
+              <option value="Tamil Nadu">Tamil Nadu</option>
+              <option value="Telangana">Telangana</option>
+              <option value="Uttar Pradesh">Uttar Pradesh</option>
+              <option value="West Bengal">West Bengal</option>
             </select>
           </div>
         </div>
       </div>
 
-      {/* SECTION 2: Economic & Household */}
+      {/* SECTION 2: Economic & Household Assets / Exclusions */}
       <div className="border-t border-slate-100 pt-6">
         <h4 className="text-xs font-extrabold text-slate-400 uppercase tracking-wider mb-4 flex items-center gap-1.5">
           <IndianRupee className="w-3.5 h-3.5 text-emerald-500" />
-          <span>2. Economic & Household Criteria</span>
+          <span>2. Household Assets, Land Ownership & Statutory Exclusions</span>
         </h4>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+          {/* Target Beneficiary Unit */}
+          <div>
+            <label className="block text-xs font-bold text-slate-700 mb-1.5 flex items-center gap-1.5">
+              <Building className="w-3.5 h-3.5 text-indigo-500" />
+              Target Beneficiary Unit:
+            </label>
+            <select
+              value={formData.beneficiary_type}
+              onChange={(e) => handleChange("beneficiary_type", e.target.value)}
+              className="w-full text-xs sm:text-sm px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:bg-white"
+            >
+              <option value="All">All Schemes (Individual & Family)</option>
+              <option value="Family / Household">👨‍👩‍👧 Family / Household Schemes (Housing, Land, Health, Ration)</option>
+              <option value="Individual">👤 Individual Citizen Schemes (Scholarships, Loans, Pensions)</option>
+            </select>
+          </div>
+
           {/* Annual Income */}
           <div>
             <label className="block text-xs font-bold text-slate-700 mb-1.5 flex items-center gap-1.5">
@@ -216,6 +247,21 @@ export default function QuickFormIntake({ profile, setProfile, onEvaluate, isEva
             />
           </div>
 
+          {/* Income Tax Returns (ITR) */}
+          <div>
+            <label className="block text-xs font-bold text-slate-700 mb-1.5">
+              Income Tax Returns (ITR / Taxpayer):
+            </label>
+            <select
+              value={formData.is_tax_payer ? "true" : "false"}
+              onChange={(e) => handleChange("is_tax_payer", e.target.value === "true")}
+              className="w-full text-xs sm:text-sm px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:bg-white"
+            >
+              <option value="false">Non-Taxpayer (ITR Exempt - Eligible for Welfare)</option>
+              <option value="true">Yes, Family member pays Income Tax / Files ITR</option>
+            </select>
+          </div>
+
           {/* BPL / Ration Card */}
           <div>
             <label className="block text-xs font-bold text-slate-700 mb-1.5">
@@ -226,12 +272,12 @@ export default function QuickFormIntake({ profile, setProfile, onEvaluate, isEva
               onChange={(e) => handleChange("has_bpl_ration_card", e.target.value === "true")}
               className="w-full text-xs sm:text-sm px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:bg-white"
             >
-              <option value="false">No / General Card</option>
-              <option value="true">Yes, BPL / Antyodaya / NFSA Card Holder</option>
+              <option value="false">No / General APL Card</option>
+              <option value="true">Yes, BPL / Antyodaya / NFSA White/Pink Card</option>
             </select>
           </div>
 
-          {/* Pucca House */}
+          {/* Pucca House Ownership */}
           <div>
             <label className="block text-xs font-bold text-slate-700 mb-1.5">
               Owns Permanent Pucca House:
@@ -241,8 +287,66 @@ export default function QuickFormIntake({ profile, setProfile, onEvaluate, isEva
               onChange={(e) => handleChange("owns_pucca_house", e.target.value === "true")}
               className="w-full text-xs sm:text-sm px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:bg-white"
             >
-              <option value="false">No (Eligible for PMAY ₹2.67L Housing Subsidy)</option>
-              <option value="true">Yes, Family owns a pucca house</option>
+              <option value="false">No (Houseless / Kutcha house - Eligible for PMAY ₹1.3L-₹2.67L)</option>
+              <option value="true">Yes, Family owns a permanent pucca house</option>
+            </select>
+          </div>
+
+          {/* Motorized 4-Wheeler Vehicle */}
+          <div>
+            <label className="block text-xs font-bold text-slate-700 mb-1.5">
+              Owns Motorized 4-Wheeler Vehicle:
+            </label>
+            <select
+              value={formData.owns_motorized_vehicle ? "true" : "false"}
+              onChange={(e) => handleChange("owns_motorized_vehicle", e.target.value === "true")}
+              className="w-full text-xs sm:text-sm px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:bg-white"
+            >
+              <option value="false">No 4-Wheeler (Satisfies asset caps)</option>
+              <option value="true">Yes, Family owns a car / tractor / 4-wheeler</option>
+            </select>
+          </div>
+
+          {/* Land Ownership & Landless Status */}
+          <div>
+            <label className="block text-xs font-bold text-slate-700 mb-1.5">
+              Farmland / Agricultural Land:
+            </label>
+            <select
+              value={formData.is_landless ? "landless" : (formData.owns_agricultural_land ? "owns_land" : "no_land")}
+              onChange={(e) => {
+                const val = e.target.value;
+                if (val === "landless") {
+                  handleChange("is_landless", true);
+                  handleChange("owns_agricultural_land", false);
+                } else if (val === "owns_land") {
+                  handleChange("is_landless", false);
+                  handleChange("owns_agricultural_land", true);
+                } else {
+                  handleChange("is_landless", false);
+                  handleChange("owns_agricultural_land", false);
+                }
+              }}
+              className="w-full text-xs sm:text-sm px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:bg-white"
+            >
+              <option value="no_land">Non-Agricultural / Urban</option>
+              <option value="owns_land">🌾 Owns Cultivable Farmland (PM-KISAN / Rythu Bandhu)</option>
+              <option value="landless">🚫 Completely Landless Family (Vasundhara / Land Patta Allotment)</option>
+            </select>
+          </div>
+
+          {/* House Site Plot for Construction */}
+          <div>
+            <label className="block text-xs font-bold text-slate-700 mb-1.5">
+              Available House Site Plot / Homestead:
+            </label>
+            <select
+              value={formData.has_homestead_plot ? "true" : "false"}
+              onChange={(e) => handleChange("has_homestead_plot", e.target.value === "true")}
+              className="w-full text-xs sm:text-sm px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:bg-white"
+            >
+              <option value="true">Yes, Has land parcel / homestead site for building</option>
+              <option value="false">No (Siteless family needing land patta allotment)</option>
             </select>
           </div>
         </div>

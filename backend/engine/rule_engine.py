@@ -130,12 +130,26 @@ class RuleEngine:
                 failed.append(f"Category '{user.caste}' not eligible. Applicable: {', '.join(scheme.caste_category)}")
 
         # 6. State / Location check
-        if user.state and scheme.states_applicable:
-            scheme_states = [s.lower() for s in scheme.states_applicable]
-            if "all india" in scheme_states or user.state.lower() in scheme_states:
-                matched.append(f"Applicable in your state ({user.state})")
+        if scheme.states_applicable:
+            scheme_states = [s.lower().strip() for s in scheme.states_applicable]
+            user_state_norm = (user.state or "All India").lower().strip()
+
+            is_all_india_scheme = "all india" in scheme_states
+            is_state_match = (
+                user_state_norm in scheme_states
+                or (scheme.state_name and scheme.state_name.lower().strip() == user_state_norm)
+            )
+
+            if is_all_india_scheme:
+                matched.append("Nationwide Scheme (Open to all Indian States & UTs)")
+            elif is_state_match:
+                matched.append(f"State-specific scheme applicable in {user.state}")
+            elif user_state_norm in ["all india", "all", "any", ""]:
+                # If user hasn't picked a specific state, permit discovery but note state prerequisite
+                matched.append(f"State Scheme designated for {scheme.state_name or ', '.join(scheme.states_applicable)}")
             else:
-                failed.append(f"Not applicable in {user.state}. Applicable states: {', '.join(scheme.states_applicable)}")
+                target_state = scheme.state_name or ', '.join(scheme.states_applicable)
+                failed.append(f"Scheme is designated specifically for residents of {target_state} (applicant is in {user.state})")
 
         # 7. Area Applicability (Rural / Urban)
         if scheme.area_applicability and scheme.area_applicability != "All" and user.area_type and user.area_type != "All":
@@ -194,14 +208,68 @@ class RuleEngine:
             else:
                 matched.append("Applicant / Family does not own a pucca house")
 
-        # 14. Income Tax Payer restriction (PM-KISAN, PM-SYM)
+        # 14. Income Tax Payer (ITR) restriction (PM-KISAN, PM-SYM, Gruha Lakshmi, Ladli Behna, PMAY)
         if rules.get("income_tax_payer") is False or rules.get("not_income_tax_payer") is True:
             if user.is_tax_payer is True:
-                failed.append("Income tax paying individuals/families are excluded from this benefit")
+                failed.append("Individuals/Families filing Income Tax Returns (ITR) are excluded under scheme guidelines")
             else:
-                matched.append("Non-taxpayer eligibility criterion satisfied")
+                matched.append("Non-taxpayer / ITR-exempt household criterion satisfied")
 
-        # 15. Min Educational Qualification check
+        # 15. Motorized 4-Wheeler Vehicle restriction (NFSA, PMAY, Ladli Behna, BPL entitlement)
+        if rules.get("no_four_wheeler") is True or rules.get("no_motorized_vehicle") is True:
+            if user.owns_motorized_vehicle is True:
+                failed.append("Households owning a 4-wheeler motorized vehicle (car/tractor/commercial vehicle) are disqualified")
+            else:
+                matched.append("Does not own a motorized 4-wheeler vehicle (asset limit satisfied)")
+
+        # 16. Land Ownership Requirements
+        # (a) Requires Land Ownership (PM-KISAN, Rythu Bandhu, SMAM)
+        if rules.get("requires_land_ownership") is True or rules.get("owns_agricultural_land") is True:
+            has_land = (
+                user.owns_agricultural_land is True
+                or (user.land_holding_acres is not None and user.land_holding_acres > 0)
+                or (user.is_farmer is True and user.is_landless is False)
+            )
+            if has_land:
+                max_acres = rules.get("max_land_holding_acres")
+                if max_acres and user.land_holding_acres and user.land_holding_acres > max_acres:
+                    failed.append(f"Landholding ({user.land_holding_acres} acres) exceeds ceiling of {max_acres} acres")
+                else:
+                    matched.append(f"Cultivable agricultural land ownership verified ({user.land_holding_acres or 'Registered'} acres)")
+            else:
+                failed.append("Scheme requires ownership of cultivable agricultural land in applicant's/family's name")
+
+        # (b) Requires Landless Status (Vasundhara, Land Allotment, Landless Agri Labourers)
+        if rules.get("requires_landless") is True:
+            is_landless_verified = (
+                user.is_landless is True
+                or (user.owns_agricultural_land is False and (user.land_holding_acres is None or user.land_holding_acres == 0))
+            )
+            if is_landless_verified:
+                matched.append("Landless / non-landowning household status satisfied")
+            else:
+                failed.append("Scheme is designated exclusively for landless households who do not own agricultural land")
+
+        # (c) Requires House Site / Homestead Plot for Construction (PMAY, Abua Awas, Ashraya)
+        if rules.get("requires_house_site_plot") is True:
+            if user.has_homestead_plot is True or user.owns_pucca_house is False:
+                matched.append("Homestead plot / land parcel available for housing construction")
+            else:
+                failed.append("Requires an available residential plot or unencumbered homestead site for construction")
+
+        # 17. Beneficiary Unit Level (Family / Household vs Individual)
+        scheme_level = getattr(scheme, "beneficiary_level", "Individual")
+        user_target_level = getattr(user, "beneficiary_type", "All") or "All"
+        if user_target_level != "All" and scheme_level != "Both":
+            if user_target_level.lower() in ["family", "family / household", "household"] and "individual" in scheme_level.lower():
+                # Note: Still eligible if other criteria pass, but tag accordingly
+                matched.append("Individual-level welfare entitlement")
+            elif user_target_level.lower() == "individual" and "family" in scheme_level.lower():
+                matched.append("Family / Household-level collective entitlement")
+        elif "family" in scheme_level.lower():
+            matched.append("Family / Household-level welfare entitlement (covers all eligible household members)")
+
+        # 18. Min Educational Qualification check
         min_qual_text = rules.get("min_qualification", "")
         if min_qual_text and "8th" in min_qual_text:
             req_rank = QUALIFICATION_RANKS["8th pass"]

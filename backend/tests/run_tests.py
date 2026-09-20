@@ -153,6 +153,145 @@ class TestMultiDomainRuleEngine(unittest.TestCase):
 
         self.assertIn("pm_sym_pension", direct_ids)
 
+    def test_maharashtra_state_scheme_match(self):
+        # Maharashtra resident female
+        user = UserProfile(
+            age=28,
+            gender="Female",
+            caste="OBC",
+            occupation="Unemployed",
+            annual_income=200000,
+            state="Maharashtra",
+        )
+        direct_ids = []
+        for scheme in self.rule_engine.schemes:
+            is_direct, matched, failed = self.rule_engine.evaluate_scheme(user, scheme)
+            if is_direct:
+                direct_ids.append(scheme.id)
+
+        # Should match Central PM-JAY AND Maharashtra MJPJAY AND Maharashtra Majhi Ladki Bahin
+        self.assertIn("pm_jay_health", direct_ids)
+        self.assertIn("mjpjay_maharashtra", direct_ids)
+        self.assertIn("majhi_ladki_bahin_maharashtra", direct_ids)
+        # Should NOT match Karnataka or Tamil Nadu state schemes
+        self.assertNotIn("gruha_lakshmi_karnataka", direct_ids)
+        self.assertNotIn("cmchis_tamil_nadu", direct_ids)
+
+    def test_bihar_udyami_scheme(self):
+        # Bihar resident entrepreneur
+        user = UserProfile(
+            age=22,
+            gender="Female",
+            caste="SC",
+            occupation="Entrepreneur",
+            annual_income=250000,
+            state="Bihar",
+            education_level="Graduate",
+            is_new_project=True,
+        )
+        direct_ids = []
+        for scheme in self.rule_engine.schemes:
+            is_direct, matched, failed = self.rule_engine.evaluate_scheme(user, scheme)
+            if is_direct:
+                direct_ids.append(scheme.id)
+
+        self.assertIn("udyami_yojana_bihar", direct_ids)
+        self.assertIn("kanya_utthan_bihar", direct_ids)
+        self.assertNotIn("mjpjay_maharashtra", direct_ids)
+
+    def test_odisha_bsky_and_kalia(self):
+        # Odisha farmer
+        user = UserProfile(
+            age=42,
+            gender="Male",
+            caste="OBC",
+            occupation="Farmer",
+            annual_income=120000,
+            state="Odisha",
+            is_farmer=True,
+            has_bpl_ration_card=True,
+        )
+        direct_ids = []
+        for scheme in self.rule_engine.schemes:
+            is_direct, matched, failed = self.rule_engine.evaluate_scheme(user, scheme)
+            if is_direct:
+                direct_ids.append(scheme.id)
+
+        self.assertIn("bsky_odisha", direct_ids)
+        self.assertIn("kalia_odisha", direct_ids)
+        self.assertNotIn("kisan_sahay_gujarat", direct_ids)
+
+    def test_family_land_and_housing_scheme(self):
+        # Rural houseless family in Andhra Pradesh
+        user = UserProfile(
+            age=36,
+            gender="Female",
+            caste="OBC",
+            occupation="Construction Worker",
+            annual_income=140000,
+            state="Andhra Pradesh",
+            area_type="Rural",
+            owns_pucca_house=False,
+            has_homestead_plot=True,
+            owns_motorized_vehicle=False,
+            is_tax_payer=False,
+            has_bpl_ration_card=True,
+            beneficiary_type="Family / Household",
+        )
+        direct_ids = []
+        for scheme in self.rule_engine.schemes:
+            is_direct, matched, failed = self.rule_engine.evaluate_scheme(user, scheme)
+            if is_direct:
+                direct_ids.append(scheme.id)
+
+        # Should match national PMAY-G and AP Pedalandariki Illu (free house site + construction)
+        self.assertIn("pmay_gramin_housing", direct_ids)
+        self.assertIn("pedalandariki_illu_ap", direct_ids)
+
+    def test_four_wheeler_and_itr_disqualification(self):
+        # High asset household owning a car and paying income tax
+        user = UserProfile(
+            age=38,
+            gender="Male",
+            caste="General",
+            occupation="Salaried",
+            annual_income=900000,
+            state="Maharashtra",
+            owns_motorized_vehicle=True,
+            is_tax_payer=True,
+            owns_pucca_house=True,
+        )
+        pmay = next(s for s in self.rule_engine.schemes if s.id == "pmay_gramin_housing")
+        is_direct, matched, failed = self.rule_engine.evaluate_scheme(user, pmay)
+
+        self.assertFalse(is_direct)
+        self.assertTrue(any("4-wheeler" in f or "car" in f for f in failed))
+        self.assertTrue(any("Income Tax" in f or "ITR" in f for f in failed))
+        self.assertTrue(any("pucca house" in f for f in failed))
+
+    def test_landless_family_land_allotment(self):
+        # Landless rural family in Odisha
+        user = UserProfile(
+            age=40,
+            gender="Male",
+            caste="SC",
+            occupation="Unemployed",
+            annual_income=80000,
+            state="Odisha",
+            area_type="Rural",
+            is_landless=True,
+            owns_agricultural_land=False,
+            owns_pucca_house=False,
+        )
+        direct_ids = []
+        for scheme in self.rule_engine.schemes:
+            is_direct, matched, failed = self.rule_engine.evaluate_scheme(user, scheme)
+            if is_direct:
+                direct_ids.append(scheme.id)
+
+        # Should match Vasundhara homestead land distribution
+        self.assertIn("vasundhara_odisha", direct_ids)
+
     def test_near_miss_girl_child_age(self):
         # Girl child is 11 years old (exceeds 10-year limit by 1 year)
         user = UserProfile(

@@ -194,6 +194,94 @@ Return STRICT JSON matching:
             extracted_updates.setdefault("is_construction_worker", True)
             extracted_updates.setdefault("is_unorganised_worker", True)
 
+        # Extract Domain Requirements / Goals (Medical, Solar, Scholarship, Loan, etc.)
+        current_interests = list(current_profile.interested_domains or [])
+
+        # 1. Health & Medical
+        if any(w in text_lower for w in ["medical", "health", "hospital", "doctor", "treatment", "disease", "illness", "ayushman", "surgery", "medicine", "patient", "clinic", "cure"]):
+            if "Health & Medical" not in current_interests:
+                current_interests.append("Health & Medical")
+            extracted_updates.setdefault("specific_goal", "Medical treatment and healthcare coverage")
+
+        # 2. Education & Scholarships
+        if any(w in text_lower for w in ["scholarship", "college fee", "school fee", "tuition", "study loan", "higher education", "fellowship"]):
+            if "Education & Scholarships" not in current_interests:
+                current_interests.append("Education & Scholarships")
+            extracted_updates.setdefault("specific_goal", "Higher education & scholarship support")
+
+        # 3. Environment & Solar Rooftop
+        if any(w in text_lower for w in ["solar", "rooftop", "electricity bill", "solar panel", "muft bijli", "sun power"]):
+            if "Environment & Sustainability" not in current_interests:
+                current_interests.append("Environment & Sustainability")
+            extracted_updates.setdefault("has_solar_rooftop_space", True)
+            extracted_updates.setdefault("specific_goal", "Rooftop solar subsidy & free electricity")
+
+        # 4. MSME & Business Loans
+        if any(w in text_lower for w in ["business loan", "startup fund", "shop loan", "msme grant", "working capital", "pmebg", "mudra", "stand up"]):
+            if "MSME, Business & Entrepreneurship" not in current_interests:
+                current_interests.append("MSME, Business & Entrepreneurship")
+            extracted_updates.setdefault("specific_goal", "Business setup loan & capital subsidy")
+
+        # 5. Agriculture & Farming
+        if any(w in text_lower for w in ["crop insurance", "kisan loan", "tractor subsidy", "fertilizer subsidy", "farm equipment", "pm kisan"]):
+            if "Agriculture & Allied Activities" not in current_interests:
+                current_interests.append("Agriculture & Allied Activities")
+            extracted_updates.setdefault("is_farmer", True)
+            extracted_updates.setdefault("specific_goal", "Agricultural financial support & crop insurance")
+
+        # 6. Women & Child
+        if any(w in text_lower for w in ["daughter", "girl child", "sukanya", "maternity", "pregnant", "lakhpati didi"]):
+            if "Women & Child Welfare" not in current_interests:
+                current_interests.append("Women & Child Welfare")
+
+        # 7. Housing & Land Allotment
+        if any(w in text_lower for w in ["house loan", "housing subsidy", "pmay", "pucca house", "awas yojana", "home construction", "land allotment", "patta", "homestead", "property card", "svamitva", "plot"]):
+            if "Housing & Shelter" not in current_interests:
+                current_interests.append("Housing & Shelter")
+            extracted_updates.setdefault("specific_goal", "Affordable family housing & land title patta allotment")
+            if any(w in text_lower for w in ["land", "patta", "plot", "homestead"]):
+                extracted_updates.setdefault("beneficiary_type", "Family / Household")
+
+        # 8. Disability
+        if any(w in text_lower for w in ["disabled", "disability", "divyang", "tricycle", "wheelchair", "hearing aid", "adip"]):
+            if "Disability & Accessibility" not in current_interests:
+                current_interests.append("Disability & Accessibility")
+            extracted_updates.setdefault("is_differently_abled", True)
+
+        # 9. Senior Citizens
+        if any(w in text_lower for w in ["old age pension", "senior citizen", "pension scheme", "elderly"]):
+            if "Senior Citizens & Elderly Welfare" not in current_interests:
+                current_interests.append("Senior Citizens & Elderly Welfare")
+
+        # 10. Family vs Individual Beneficiary Level
+        if any(w in text_lower for w in ["family", "household", "my family", "entire family", "for whole family", "land for family", "house for family"]):
+            extracted_updates["beneficiary_type"] = "Family / Household"
+        elif any(w in text_lower for w in ["individual", "for myself", "personal scholarship", "personal loan"]):
+            extracted_updates["beneficiary_type"] = "Individual"
+
+        # 11. Land Ownership / Landless Status
+        if any(w in text_lower for w in ["landless", "no land", "don't have land", "no agricultural land"]):
+            extracted_updates["is_landless"] = True
+            extracted_updates["owns_agricultural_land"] = False
+        elif any(w in text_lower for w in ["own land", "have farmland", "agricultural land", "acres", "farm land"]):
+            extracted_updates["owns_agricultural_land"] = True
+            extracted_updates["is_landless"] = False
+
+        # 12. Motorized Vehicle Ownership
+        if any(w in text_lower for w in ["own a car", "have a car", "own a tractor", "have a 4 wheeler", "4-wheeler"]):
+            extracted_updates["owns_motorized_vehicle"] = True
+        elif any(w in text_lower for w in ["no car", "no vehicle", "don't have car", "no 4 wheeler"]):
+            extracted_updates["owns_motorized_vehicle"] = False
+
+        # 13. Income Tax / ITR Status
+        if any(w in text_lower for w in ["income tax payer", "pay income tax", "file itr", "paying tax", "itr filer"]):
+            extracted_updates["is_tax_payer"] = True
+        elif any(w in text_lower for w in ["non tax payer", "don't pay tax", "no income tax", "itr exempt", "exempt from tax"]):
+            extracted_updates["is_tax_payer"] = False
+
+        if current_interests:
+            extracted_updates["interested_domains"] = current_interests
+
         # Specialized Vulnerabilities
         if "pregnant" in text_lower or "expecting" in text_lower or "lactating" in text_lower or "maternity" in text_lower:
             extracted_updates.setdefault("is_pregnant_or_lactating", True)
@@ -204,9 +292,6 @@ Return STRICT JSON matching:
             gc_age = re.search(r'(?:daughter|girl|child)\s*(?:is|of|age)?\s*(\d{1,2})', text_lower)
             if gc_age:
                 extracted_updates.setdefault("girl_child_age", int(gc_age.group(1)))
-
-        if "solar" in text_lower or "rooftop" in text_lower or "electricity bill" in text_lower or "solar panel" in text_lower:
-            extracted_updates.setdefault("has_solar_rooftop_space", True)
 
         if "disabled" in text_lower or "disability" in text_lower or "handicapped" in text_lower or "divyang" in text_lower:
             extracted_updates.setdefault("is_differently_abled", True)
@@ -225,6 +310,7 @@ Return STRICT JSON matching:
             if v is not None:
                 updated_dict[k] = v
         new_profile = UserProfile(**updated_dict)
+
 
         # Fallback assistant reply if LLM didn't produce one
         if not assistant_reply:

@@ -55,11 +55,16 @@ class UserProfile(BaseModel):
         description="Primary goal (e.g. Higher Education, Business Loan, Housing, Health Cover, Solar Subsidy, Pension, Farm Equipment)",
     )
 
-    # Economic & Household
+    # Economic & Household Assets / Exclusions
     annual_income: Optional[float] = Field(None, description="Annual Gross Household Income in INR")
     has_bpl_ration_card: Optional[bool] = Field(False, description="Whether family holds BPL / Antyodaya / Ration Card")
     owns_pucca_house: Optional[bool] = Field(False, description="Whether family already owns a permanent pucca house")
-    is_tax_payer: Optional[bool] = Field(False, description="Whether applicant or spouse pays Income Tax")
+    is_tax_payer: Optional[bool] = Field(False, description="Whether applicant or family member pays Income Tax / files ITR")
+    owns_agricultural_land: Optional[bool] = Field(False, description="Whether applicant/family owns cultivable agricultural land")
+    is_landless: Optional[bool] = Field(False, description="Whether household is completely landless (no agricultural land)")
+    has_homestead_plot: Optional[bool] = Field(False, description="Whether family possesses a plot/homestead site for house construction")
+    owns_motorized_vehicle: Optional[bool] = Field(False, description="Whether household owns a 4-wheeler motorized vehicle (car/tractor)")
+    beneficiary_type: Optional[str] = Field("All", description="Target Beneficiary Unit: All, Individual, or Family / Household")
 
     # Business / MSME (If Entrepreneur / Artisan)
     business_type: Optional[str] = Field(None, description="Business Sector (Manufacturing, Service, Trading, Tech/Startup, Traditional Craft, Handloom)")
@@ -95,6 +100,7 @@ class Scheme(BaseModel):
     category: str = Field(..., description="Primary domain / category")
     domain: Optional[str] = None
     ministry: str
+    beneficiary_level: str = "Individual"  # "Individual", "Family / Household", "Both"
     target_audience: List[str] = []
     target_beneficiaries: List[str] = []
     min_age: Optional[int] = None
@@ -103,8 +109,10 @@ class Scheme(BaseModel):
     gender_preference: str = "All"
     caste_category: List[str] = ["General", "OBC", "SC", "ST", "EWS"]
     states_applicable: List[str] = ["All India"]
+    state_name: Optional[str] = None  # Specific State name for State Govt Schemes
     area_applicability: str = "All"  # All, Rural, Urban
-    central_or_state: str = "Central Government"
+    central_or_state: str = "Central Government"  # Central Government, State Government, Centrally Sponsored
+
     max_subsidy_or_loan: str
     financial_benefit_value: float = 0.0
     subsidy_percentage: Optional[str] = None
@@ -150,11 +158,16 @@ class ConsolidatedDocuments(BaseModel):
 class EvaluationResponse(BaseModel):
     user_profile: UserProfile
     direct_matches: List[SchemeMatch]
-    near_miss_matches: List[SchemeMatch]
+    primary_matches: List[SchemeMatch] = []
+    other_matches: List[SchemeMatch] = []
+    near_miss_matches: List[SchemeMatch] = []
     total_direct_count: int
     total_near_miss_count: int
+    expressed_requirements: Optional[List[str]] = []
+    target_domain_labels: Optional[List[str]] = []
     consolidated_documents: ConsolidatedDocuments
     summary_insight: str
+
 
 
 class IntakeQuestionOption(BaseModel):
